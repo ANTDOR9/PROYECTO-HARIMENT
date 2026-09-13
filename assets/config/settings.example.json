@@ -1,0 +1,29 @@
+{
+  "idioma_origen": "auto",
+  "idioma_destino": "en",
+  "idiomas_disponibles": ["es", "en", "pt"],
+  "fuente_entrada": "microfono",
+
+  "subtitulos": {
+    "posicion": "inferior",
+    "tamano_fuente": 24,
+    "color_texto": "#FFFFFF",
+    "color_fondo": "#000000",
+    "opacidad_fondo": 0.6,
+    "tiempo_permanencia_segundos": 4
+  },
+
+  "audio": {
+    "modelo_whisper": "small",
+    "dispositivo": "cpu"
+  },
+
+  "ocr": {
+    "motor": "pytesseract"
+  },
+
+  "api": {
+    "host": "127.0.0.1",
+    "puerto": 8000
+  }
+}

@@ -51,6 +51,56 @@ A futuro, cada entrada y la traducción podrán exponerse como endpoints indepen
 
 En planificación / diseño inicial. Aún no hay código implementado.
 
+## Estructura de carpetas
+
+```
+PROYECTO-HARIMENT/
+├── src/hariment/
+│   ├── audio/            # Captura de micrófono y audio del sistema (loopback) + transcripción con Whisper
+│   │   ├── microfono.py
+│   │   └── sistema_loopback.py
+│   ├── ocr/               # Captura de pantalla y reconocimiento de texto (OCR)
+│   │   ├── captura_pantalla.py
+│   │   └── reconocimiento_texto.py
+│   ├── translation/       # Núcleo de traducción automática (transformers)
+│   │   └── traductor.py
+│   ├── subtitles/         # Overlay de subtítulos en pantalla (configurable)
+│   │   └── overlay.py
+│   ├── gui/                # Interfaz gráfica de escritorio
+│   │   ├── app.py
+│   │   └── configuracion.py
+│   └── api/                # API (FastAPI) que expone el motor del proyecto
+│       └── main.py
+├── scripts/                # Puntos de entrada (lanzar GUI, lanzar API)
+│   ├── run_gui.py
+│   └── run_api.py
+├── tests/                   # Pruebas unitarias por módulo
+├── docs/                    # Documentación técnica (arquitectura, etapas)
+│   ├── arquitectura.md
+│   └── etapas.md
+├── assets/
+│   ├── config/              # Archivos de configuración (idiomas, estilo de subtítulos)
+│   └── icons/                # Recursos gráficos de la interfaz
+├── requirements.txt
+├── .gitignore
+├── LICENSE
+└── README.md
+```
+
+## Etapas de desarrollo
+
+El desarrollo está planificado en 9 etapas, desde la configuración base hasta el empaquetado final. Detalle completo en [`docs/etapas.md`](docs/etapas.md):
+
+1. Configuración base del proyecto
+2. Núcleo de traducción de texto
+3. Reconocimiento de voz por micrófono
+4. Interfaz gráfica mínima con subtítulos
+5. Configuración de subtítulos e idiomas
+6. Audio del sistema (loopback)
+7. Captura de pantalla + OCR
+8. Exposición como API
+9. Empaquetado y pulido final
+
 ## Roadmap
 
 1. Prototipo base: transcripción por micrófono (Whisper) + traducción español → inglés (transformers), con interfaz mínima.
@@ -60,6 +110,30 @@ En planificación / diseño inicial. Aún no hay código implementado.
 5. Selección de idioma de entrada/salida, con soporte ampliado (prioridad: portugués y otros idiomas de Latinoamérica).
 6. Exposición del motor como API (FastAPI), desacoplando la lógica de la interfaz.
 7. Exploración de una interfaz de escritorio más avanzada y una futura versión para teléfono.
+
+## Instalación
+
+Requiere Python 3.10 o superior.
+
+```bash
+# 1. Clonar el repositorio
+git clone https://github.com/<usuario>/PROYECTO-HARIMENT.git
+cd PROYECTO-HARIMENT
+
+# 2. Crear y activar entorno virtual
+python -m venv venv
+venv\Scripts\activate      # Windows
+source venv/bin/activate     # Linux/Mac
+
+# 3. Instalar dependencias
+pip install -r requirements.txt
+
+# 4. Copiar configuración de ejemplo
+copy assets\config\settings.example.json assets\config\settings.json   # Windows
+cp assets/config/settings.example.json assets/config/settings.json               # Linux/Mac
+```
+
+> Nota: `pytesseract` requiere además tener instalado el motor [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) en el sistema operativo.
 
 ## Licencia
 

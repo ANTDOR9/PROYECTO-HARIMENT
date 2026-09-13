@@ -1,0 +1,26 @@
+# Entornos virtuales
+venv/
+.venv/
+env/
+
+# Cache Python
+__pycache__/
+*.pyc
+
+# Modelos descargados / pesos (Whisper, transformers, etc.)
+*.pt
+*.bin
+*.onnx
+models_cache/
+
+# Configuración local del usuario
+assets/config/settings.json
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Entornos / IDE
+.env
+.idea/
+.vscode/

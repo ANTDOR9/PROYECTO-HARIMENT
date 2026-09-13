@@ -1,0 +1,22 @@
+# Reconocimiento de voz
+openai-whisper
+
+# Traducción y OCR con IA
+transformers
+torch
+
+# Audio del sistema (loopback, Windows)
+pyaudiowpatch
+soundcard
+
+# Captura de pantalla y OCR clásico
+mss
+pillow
+pytesseract
+
+# Interfaz gráfica
+customtkinter
+
+# API
+fastapi
+uvicorn
