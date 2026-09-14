@@ -240,6 +240,11 @@ class AplicacionHariment:
         )
         self.boton_configuracion.pack(side="right")
 
+        self.boton_copiar_api = self._boton(
+            fila_1, texto="📋 Copiar API", comando=self._copiar_url_api
+        )
+        self.boton_copiar_api.pack(side="right", padx=(0, 8))
+
         self.etiqueta_estado = self._etiqueta(
             fila_1, texto="● Detenido", color=COLOR_ESTADO_INACTIVO, negrita=True
         )
@@ -586,6 +591,32 @@ class AplicacionHariment:
         else:
             mensaje = "No se detectó texto en pantalla."
             self.ventana.after(0, lambda: self.etiqueta_subtitulo.configure(text=mensaje))
+
+    def _copiar_url_api(self) -> None:
+        """Copia al portapapeles la URL base de la API (host:puerto de
+        `hariment.api.main`, ver `scripts/run_api.py`), para que el
+        usuario la pueda pegar directo en el navegador, Postman, u otra
+        app sin tener que ir a buscarla en la configuracion.
+
+        Nota: esto solo copia la direccion; el servidor de la API se
+        levanta aparte con `python scripts/run_api.py` (no lo inicia
+        este boton).
+        """
+        api_config = self.configuracion.get("api", {})
+        host = api_config.get("host", "127.0.0.1")
+        puerto = api_config.get("puerto", 8000)
+        url = f"http://{host}:{puerto}"
+
+        try:
+            self.ventana.clipboard_clear()
+            self.ventana.clipboard_append(url)
+            self.ventana.update()  # necesario en Windows para que el portapapeles "pegue"
+            mensaje = f"URL de la API copiada: {url}"
+        except Exception:
+            logger.warning("No se pudo copiar la URL de la API al portapapeles", exc_info=True)
+            mensaje = f"No se pudo copiar automáticamente. URL de la API: {url}"
+
+        self.etiqueta_subtitulo.configure(text=mensaje)
 
     def _abrir_configuracion(self) -> None:
         ventana_configuracion = crear_ventana_configuracion(

@@ -35,6 +35,7 @@ Uso basico:
 from __future__ import annotations
 
 import queue
+import sys
 import threading
 from typing import Callable, Optional
 
@@ -149,40 +150,84 @@ class TranscriptorAudioSistema:
         return sc.get_microphone(id=str(altavoz.name), include_loopback=True)
 
     def _bucle_escucha(self) -> None:
-        microfono_loopback = self._obtener_microfono_loopback()
-        tamano_bloque = int(FRECUENCIA_MUESTREO * DURACION_BLOQUE_SEGUNDOS)
+        com_inicializado = self._inicializar_com_si_hace_falta()
+        try:
+            microfono_loopback = self._obtener_microfono_loopback()
+            tamano_bloque = int(FRECUENCIA_MUESTREO * DURACION_BLOQUE_SEGUNDOS)
 
-        buffer_frase: list[np.ndarray] = []
-        segundos_hablando = 0.0
-        segundos_en_silencio = 0.0
+            buffer_frase: list[np.ndarray] = []
+            segundos_hablando = 0.0
+            segundos_en_silencio = 0.0
 
-        with microfono_loopback.recorder(samplerate=FRECUENCIA_MUESTREO, channels=1) as grabadora:
-            while self._escuchando.is_set():
-                bloque = grabadora.record(numframes=tamano_bloque)
-                bloque = bloque.flatten().astype("float32")
+            with microfono_loopback.recorder(samplerate=FRECUENCIA_MUESTREO, channels=1) as grabadora:
+                while self._escuchando.is_set():
+                    bloque = grabadora.record(numframes=tamano_bloque)
+                    bloque = bloque.flatten().astype("float32")
 
-                energia = float(np.sqrt(np.mean(bloque**2)))
-                hay_sonido = energia > UMBRAL_SILENCIO
+                    energia = float(np.sqrt(np.mean(bloque**2)))
+                    hay_sonido = energia > UMBRAL_SILENCIO
 
-                if hay_sonido:
-                    buffer_frase.append(bloque)
-                    segundos_hablando += DURACION_BLOQUE_SEGUNDOS
-                    segundos_en_silencio = 0.0
-                elif buffer_frase:
-                    buffer_frase.append(bloque)
-                    segundos_en_silencio += DURACION_BLOQUE_SEGUNDOS
+                    if hay_sonido:
+                        buffer_frase.append(bloque)
+                        segundos_hablando += DURACION_BLOQUE_SEGUNDOS
+                        segundos_en_silencio = 0.0
+                    elif buffer_frase:
+                        buffer_frase.append(bloque)
+                        segundos_en_silencio += DURACION_BLOQUE_SEGUNDOS
 
-                frase_lista_por_silencio = (
-                    buffer_frase and segundos_en_silencio >= SEGUNDOS_SILENCIO_PARA_CERRAR_FRASE
-                )
-                frase_lista_por_duracion_maxima = segundos_hablando >= DURACION_MAXIMA_FRASE_SEGUNDOS
+                    frase_lista_por_silencio = (
+                        buffer_frase and segundos_en_silencio >= SEGUNDOS_SILENCIO_PARA_CERRAR_FRASE
+                    )
+                    frase_lista_por_duracion_maxima = (
+                        segundos_hablando >= DURACION_MAXIMA_FRASE_SEGUNDOS
+                    )
 
-                if frase_lista_por_silencio or frase_lista_por_duracion_maxima:
-                    audio_frase = np.concatenate(buffer_frase)
-                    self._transcribir_y_notificar(audio_frase)
-                    buffer_frase = []
-                    segundos_hablando = 0.0
-                    segundos_en_silencio = 0.0
+                    if frase_lista_por_silencio or frase_lista_por_duracion_maxima:
+                        audio_frase = np.concatenate(buffer_frase)
+                        self._transcribir_y_notificar(audio_frase)
+                        buffer_frase = []
+                        segundos_hablando = 0.0
+                        segundos_en_silencio = 0.0
+        finally:
+            if com_inicializado:
+                self._finalizar_com()
+
+    @staticmethod
+    def _inicializar_com_si_hace_falta() -> bool:
+        """En Windows, `soundcard` usa COM (WASAPI) por debajo, y COM debe
+        inicializarse en CADA hilo que lo use, no solo en el hilo
+        principal. Este hilo de escucha se crea con `threading.Thread` y
+        nunca lo inicializa, por lo que la primera llamada a `soundcard`
+        (ej. `sc.default_speaker()`) fallaba con el error de Windows
+        0x800401F0 (CO_E_NOTINITIALIZED). Se hace con `ctypes` (no con
+        `pythoncom`/`pywin32`) para no agregar una dependencia extra.
+
+        Devuelve True si este hilo quedo con COM inicializado (y por lo
+        tanto hay que des-inicializarlo despues); False en cualquier otro
+        sistema operativo o si algo fallo (soundcard igual podria
+        funcionar sin esto en Linux/macOS, que no usan COM).
+        """
+        if sys.platform != "win32":
+            return False
+        try:
+            import ctypes
+
+            # COINIT_APARTMENTTHREADED (0x2): mismo modelo que usa Tkinter
+            # en su hilo principal; evita conflictos si mas adelante se
+            # mezclan componentes COM de distintos modelos de threading.
+            ctypes.windll.ole32.CoInitializeEx(None, 0x2)
+            return True
+        except Exception:
+            return False
+
+    @staticmethod
+    def _finalizar_com() -> None:
+        try:
+            import ctypes
+
+            ctypes.windll.ole32.CoUninitialize()
+        except Exception:
+            pass
 
     def _transcribir_y_notificar(self, audio: np.ndarray) -> None:
         idioma_para_whisper = None if self.idioma in (None, "auto") else self.idioma

@@ -152,6 +152,15 @@ python scripts/run_api.py
 Los logs de la aplicación (útiles para depurar errores, especialmente
 una vez empaquetada) quedan en `logs/hariment.log`.
 
+### Acceso directo en el Escritorio (Windows)
+
+Para tener un ícono de HARIMENT en el Escritorio que abra la app con un
+doble clic (sin consola visible), corre una vez:
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/crear_acceso_directo.ps1
+```
+
 ## Empaquetado (Windows)
 
 ```bash
