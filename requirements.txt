@@ -6,6 +6,8 @@ numpy
 # Traducción y OCR con IA
 transformers
 torch
+sentencepiece  # requerido por los modelos Helsinki-NLP (Marian) para tokenizar
+sacremoses     # requerido por algunos modelos Marian para pre/post-procesar texto
 
 # Audio del sistema (loopback)
 # soundcard funciona en Windows/Linux/macOS; en macOS requiere ademas
