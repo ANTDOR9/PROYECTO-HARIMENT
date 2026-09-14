@@ -7,8 +7,9 @@ numpy
 transformers
 torch
 
-# Audio del sistema (loopback, Windows)
-pyaudiowpatch
+# Audio del sistema (loopback)
+# soundcard funciona en Windows/Linux/macOS; en macOS requiere ademas
+# un dispositivo virtual de loopback instalado aparte (ej. BlackHole).
 soundcard
 
 # Captura de pantalla y OCR clásico

@@ -34,6 +34,10 @@ except ImportError:  # pragma: no cover - depende de si esta instalado
     _TIENE_CUSTOMTKINTER = False
 
 from hariment.audio.microfono import SegmentoTranscrito, TranscriptorMicrofono
+from hariment.audio.sistema_loopback import (
+    DispositivoLoopbackNoDisponibleError,
+    TranscriptorAudioSistema,
+)
 from hariment.gui.configuracion import GestorConfiguracion, crear_ventana_configuracion
 from hariment.translation.traductor import Traductor
 
@@ -61,11 +65,9 @@ class AplicacionHariment:
         idioma_destino = self.configuracion.get("idioma_destino", IDIOMA_DESTINO_POR_DEFECTO)
 
         self.traductor = Traductor(idioma_origen=idioma_origen, idioma_destino=idioma_destino)
-        self.transcriptor = TranscriptorMicrofono(
-            idioma=idioma_origen,
-            modelo=MODELO_WHISPER_POR_DEFECTO,
-            al_transcribir=self._cola_eventos.put,  # llamado desde el hilo de audio
-        )
+
+        self._fuente_entrada = self.configuracion.get("fuente_entrada", "microfono")
+        self.transcriptor = self._crear_transcriptor(self._fuente_entrada, idioma_origen)
 
         self._construir_ventana()
         self._aplicar_estilo_subtitulo(self.configuracion.get("subtitulos", {}))
@@ -113,6 +115,23 @@ class AplicacionHariment:
             marco, texto="⚙ Configuración", comando=self._abrir_configuracion
         )
         self.boton_configuracion.pack(side="right", padx=(0, 20))
+
+        self.variable_fuente = tk.StringVar(value=self._fuente_entrada)
+        marco_fuente = tk.Frame(marco, bg="#2B2B2B") if not _TIENE_CUSTOMTKINTER else self._marco(marco)
+        marco_fuente.pack(side="left", padx=(0, 20))
+        for etiqueta, valor in (("🎤 Micrófono", "microfono"), ("🔊 Audio del sistema", "sistema")):
+            tk.Radiobutton(
+                marco_fuente,
+                text=etiqueta,
+                variable=self.variable_fuente,
+                value=valor,
+                command=self._cambiar_fuente_entrada,
+                bg="#2B2B2B",
+                fg="#FFFFFF",
+                selectcolor="#2B2B2B",
+                activebackground="#2B2B2B",
+                activeforeground="#FFFFFF",
+            ).pack(side="left")
 
     def _construir_historial(self) -> None:
         self.area_historial = scrolledtext.ScrolledText(
@@ -173,8 +192,11 @@ class AplicacionHariment:
             self.transcriptor.detener()
             self._actualizar_estado(escuchando=False)
         else:
-            self.transcriptor.iniciar()
-            self._actualizar_estado(escuchando=True)
+            try:
+                self.transcriptor.iniciar()
+                self._actualizar_estado(escuchando=True)
+            except DispositivoLoopbackNoDisponibleError as error:
+                self.etiqueta_subtitulo.configure(text=str(error))
 
     def _actualizar_estado(self, escuchando: bool) -> None:
         if escuchando:
@@ -215,6 +237,45 @@ class AplicacionHariment:
         )
         self.area_historial.see("end")
         self.area_historial.configure(state="disabled")
+
+    def _crear_transcriptor(self, fuente: str, idioma_origen: str):
+        """Crea el transcriptor correspondiente a la fuente elegida
+        (microfono o audio del sistema), ambos con la misma interfaz
+        (iniciar/detener/esta_escuchando) para que el resto de la app
+        no necesite saber cual esta usando."""
+        if fuente == "sistema":
+            return TranscriptorAudioSistema(
+                idioma=idioma_origen,
+                modelo=MODELO_WHISPER_POR_DEFECTO,
+                al_transcribir=self._cola_eventos.put,
+            )
+        return TranscriptorMicrofono(
+            idioma=idioma_origen,
+            modelo=MODELO_WHISPER_POR_DEFECTO,
+            al_transcribir=self._cola_eventos.put,
+        )
+
+    def _cambiar_fuente_entrada(self) -> None:
+        """Cambia entre escuchar el microfono o el audio del sistema.
+        Si estaba escuchando, se detiene la fuente anterior antes de
+        cambiar, para no dejar dos hilos de captura corriendo a la vez."""
+        estaba_escuchando = self.transcriptor.esta_escuchando
+        if estaba_escuchando:
+            self.transcriptor.detener()
+
+        self._fuente_entrada = self.variable_fuente.get()
+        self.configuracion["fuente_entrada"] = self._fuente_entrada
+        self.gestor_configuracion.guardar(self.configuracion)
+
+        self.transcriptor = self._crear_transcriptor(self._fuente_entrada, self.traductor.idioma_origen)
+
+        if estaba_escuchando:
+            try:
+                self.transcriptor.iniciar()
+                self._actualizar_estado(escuchando=True)
+            except DispositivoLoopbackNoDisponibleError as error:
+                self._actualizar_estado(escuchando=False)
+                self.etiqueta_subtitulo.configure(text=str(error))
 
     def _abrir_configuracion(self) -> None:
         crear_ventana_configuracion(

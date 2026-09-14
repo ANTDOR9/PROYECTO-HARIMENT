@@ -15,7 +15,7 @@ Ventana de escritorio (`customtkinter`/`tkinter`) que muestra el texto transcrit
 ## Etapa 5 — Configuración de subtítulos e idiomas ✅
 Panel de configuración: posición/estilo de subtítulos, selección de idioma de entrada y salida, detección automática de idioma.
 
-## Etapa 6 — Audio del sistema (loopback)
+## Etapa 6 — Audio del sistema (loopback) ✅
 Captura del audio que reproduce el propio computador (videos, llamadas) como segunda fuente de entrada, reutilizando el mismo pipeline de transcripción/traducción.
 
 ## Etapa 7 — Captura de pantalla + OCR
