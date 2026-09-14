@@ -22,6 +22,10 @@ pytesseract
 # Interfaz gráfica
 customtkinter
 
+# Atajo de teclado global (ej. F9 para capturar pantalla sin dar foco
+# a la ventana de HARIMENT, util para usarlo mientras se juega)
+pynput
+
 # API
 fastapi
 uvicorn[standard]

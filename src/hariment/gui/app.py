@@ -88,6 +88,10 @@ class AplicacionHariment:
         self._actualizar_etiqueta_idiomas()
         self._programar_revision_de_cola()
 
+        self._atajo_captura = self.configuracion.get("ocr", {}).get("atajo_captura", "<f9>")
+        self._listener_atajo = None
+        self._iniciar_atajo_global_captura()
+
     # ------------------------------------------------------------------
     # Construccion de la interfaz
     # ------------------------------------------------------------------
@@ -115,7 +119,12 @@ class AplicacionHariment:
             marco,
             texto=f"{IDIOMA_ORIGEN_POR_DEFECTO.upper()} → {IDIOMA_DESTINO_POR_DEFECTO.upper()}",
         )
-        self.etiqueta_idiomas.pack(side="left", padx=(0, 20))
+        self.etiqueta_idiomas.pack(side="left", padx=(0, 5))
+
+        self.boton_invertir_idiomas = self._boton(
+            marco, texto="🔁", comando=self._invertir_idiomas
+        )
+        self.boton_invertir_idiomas.pack(side="left", padx=(0, 20))
 
         self.boton_iniciar_detener = self._boton(
             marco, texto="▶ Iniciar", comando=self._alternar_escucha
@@ -383,6 +392,25 @@ class AplicacionHariment:
         self._aplicar_estilo_subtitulo(nueva_configuracion.get("subtitulos", {}))
         self._actualizar_etiqueta_idiomas()
 
+    def _invertir_idiomas(self) -> None:
+        """Intercambia idioma de origen y destino (ej. es→en pasa a en→es).
+
+        Es util sobre todo para el OCR de pantalla: para hablar por el
+        microfono normalmente se usa es→en, pero para leer texto en
+        ingles (subtitulos, chats de un juego, etc.) y verlo en español
+        hace falta el par contrario. En vez de entrar a Configuración
+        cada vez, este boton lo cambia con un clic.
+        """
+        nuevo_origen, nuevo_destino = self.traductor.idioma_destino, self.traductor.idioma_origen
+        self.traductor.cambiar_idiomas(nuevo_origen, nuevo_destino)
+        self.transcriptor.idioma = nuevo_origen
+
+        self.configuracion["idioma_origen"] = nuevo_origen
+        self.configuracion["idioma_destino"] = nuevo_destino
+        self.gestor_configuracion.guardar(self.configuracion)
+
+        self._actualizar_etiqueta_idiomas()
+
     def _aplicar_estilo_subtitulo(self, subtitulos: dict) -> None:
         color_fondo = subtitulos.get("color_fondo", COLOR_FONDO_SUBTITULO)
         color_texto = subtitulos.get("color_texto", COLOR_TEXTO_SUBTITULO)
@@ -401,8 +429,54 @@ class AplicacionHariment:
             text=f"{self.traductor.idioma_origen.upper()} → {self.traductor.idioma_destino.upper()}"
         )
 
+    def _iniciar_atajo_global_captura(self) -> None:
+        """Registra una tecla rapida global (por defecto F9) para disparar
+        '📷 Traducir pantalla' sin importar que ventana tenga el foco.
+
+        Esto es clave para usarlo mientras se juega: no hace falta
+        minimizar el juego ni cambiar de ventana para hacer clic en el
+        boton, algo que en juegos en pantalla completa/ventana sin
+        bordes es muy incomodo o directamente imposible.
+
+        Usa `pynput`, que engancha el teclado a nivel de sistema (no
+        requiere permisos de administrador en Windows). Si la libreria
+        no esta instalada, la app sigue funcionando normalmente: solo
+        no habra atajo global, y se avisa una vez en el historial.
+        """
+        try:
+            from pynput import keyboard as pynput_keyboard
+        except ImportError:
+            logger.warning(
+                "pynput no esta instalado: el atajo global de captura (%s) "
+                "no estara disponible. Instalalo con 'pip install pynput' "
+                "para activarlo.",
+                self._atajo_captura,
+            )
+            return
+
+        def _al_presionar_atajo():
+            # El listener de pynput corre en su propio hilo del sistema
+            # operativo; hay que pasar el trabajo al hilo principal de
+            # tkinter con .after(0, ...) para no tocar la interfaz desde
+            # fuera de ese hilo.
+            self.ventana.after(0, self._capturar_y_traducir_pantalla)
+
+        try:
+            self._listener_atajo = pynput_keyboard.GlobalHotKeys(
+                {self._atajo_captura: _al_presionar_atajo}
+            )
+            self._listener_atajo.start()
+            logger.info("Atajo global de captura activado: %s", self._atajo_captura)
+        except Exception:
+            logger.exception(
+                "No se pudo activar el atajo global de captura (%s)", self._atajo_captura
+            )
+            self._listener_atajo = None
+
     def _al_cerrar_ventana(self) -> None:
         self.transcriptor.detener()
+        if self._listener_atajo is not None:
+            self._listener_atajo.stop()
         self.ventana.destroy()
 
     def ejecutar(self) -> None:

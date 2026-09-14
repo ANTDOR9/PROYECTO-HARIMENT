@@ -19,7 +19,8 @@
   },
 
   "ocr": {
-    "motor": "pytesseract"
+    "motor": "pytesseract",
+    "atajo_captura": "<f9>"
   },
 
   "api": {
