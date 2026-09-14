@@ -23,6 +23,7 @@ mientras se transcribe o traduce.
 from __future__ import annotations
 
 import queue
+import threading
 import tkinter as tk
 from tkinter import scrolledtext
 
@@ -39,6 +40,8 @@ from hariment.audio.sistema_loopback import (
     TranscriptorAudioSistema,
 )
 from hariment.gui.configuracion import GestorConfiguracion, crear_ventana_configuracion
+from hariment.ocr.captura_pantalla import capturar_pantalla
+from hariment.ocr.reconocimiento_texto import ReconocedorTexto
 from hariment.translation.traductor import Traductor
 
 # Valores por defecto (alineados con assets/config/settings.example.json).
@@ -68,6 +71,9 @@ class AplicacionHariment:
 
         self._fuente_entrada = self.configuracion.get("fuente_entrada", "microfono")
         self.transcriptor = self._crear_transcriptor(self._fuente_entrada, idioma_origen)
+
+        motor_ocr = self.configuracion.get("ocr", {}).get("motor", "pytesseract")
+        self.reconocedor_texto = ReconocedorTexto(motor=motor_ocr)
 
         self._construir_ventana()
         self._aplicar_estilo_subtitulo(self.configuracion.get("subtitulos", {}))
@@ -132,6 +138,11 @@ class AplicacionHariment:
                 activebackground="#2B2B2B",
                 activeforeground="#FFFFFF",
             ).pack(side="left")
+
+        self.boton_capturar_pantalla = self._boton(
+            marco, texto="📷 Traducir pantalla", comando=self._capturar_y_traducir_pantalla
+        )
+        self.boton_capturar_pantalla.pack(side="left", padx=(0, 20))
 
     def _construir_historial(self) -> None:
         self.area_historial = scrolledtext.ScrolledText(
@@ -276,6 +287,36 @@ class AplicacionHariment:
             except DispositivoLoopbackNoDisponibleError as error:
                 self._actualizar_estado(escuchando=False)
                 self.etiqueta_subtitulo.configure(text=str(error))
+
+    def _capturar_y_traducir_pantalla(self) -> None:
+        """Toma una captura de pantalla, reconoce el texto (OCR) y lo
+        traduce, reutilizando el mismo overlay de subtitulos e historial
+        que usan el microfono y el audio del sistema."""
+        self.boton_capturar_pantalla.configure(state="disabled")
+        self.etiqueta_subtitulo.configure(text="Reconociendo texto en pantalla…")
+        # Se ejecuta en un hilo aparte: el OCR (y, con TrOCR, un modelo de
+        # transformers) puede tardar y no debe congelar la ventana.
+        threading.Thread(target=self._ejecutar_captura_en_hilo, daemon=True).start()
+
+    def _ejecutar_captura_en_hilo(self) -> None:
+        """Corre en un hilo aparte para no congelar la ventana mientras se
+        captura la pantalla y se reconoce el texto (OCR)."""
+        try:
+            imagen = capturar_pantalla()
+            texto = self.reconocedor_texto.reconocer(imagen, idioma=self.traductor.idioma_origen)
+        except Exception as error:  # se informa el error en vez de dejar la app colgada
+            mensaje = f"No se pudo capturar/reconocer la pantalla: {error}"
+            self.ventana.after(0, lambda: self.etiqueta_subtitulo.configure(text=mensaje))
+            return
+        finally:
+            self.ventana.after(0, lambda: self.boton_capturar_pantalla.configure(state="normal"))
+
+        if texto:
+            segmento = SegmentoTranscrito(texto=texto, idioma_detectado=self.traductor.idioma_origen)
+            self._cola_eventos.put(segmento)  # se traduce/muestra en el hilo principal via la cola
+        else:
+            mensaje = "No se detectó texto en pantalla."
+            self.ventana.after(0, lambda: self.etiqueta_subtitulo.configure(text=mensaje))
 
     def _abrir_configuracion(self) -> None:
         crear_ventana_configuracion(

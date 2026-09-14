@@ -18,7 +18,7 @@ Panel de configuración: posición/estilo de subtítulos, selección de idioma d
 ## Etapa 6 — Audio del sistema (loopback) ✅
 Captura del audio que reproduce el propio computador (videos, llamadas) como segunda fuente de entrada, reutilizando el mismo pipeline de transcripción/traducción.
 
-## Etapa 7 — Captura de pantalla + OCR
+## Etapa 7 — Captura de pantalla + OCR ✅
 Función para capturar pantalla, reconocer texto (`pytesseract` o `TrOCR`) y traducirlo, mostrado en el mismo overlay de subtítulos.
 
 ## Etapa 8 — Exposición como API
