@@ -1,5 +1,5 @@
 """
-Interfaz grafica minima de PROYECTO HARIMENT.
+Interfaz grafica de PROYECTO HARIMENT.
 
 Ventana de escritorio (customtkinter, con fallback a tkinter puro si
 customtkinter no esta instalado) que:
@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import logging
 import queue
+import sys
 import threading
 import tkinter as tk
 from tkinter import scrolledtext
@@ -51,17 +52,61 @@ IDIOMA_ORIGEN_POR_DEFECTO = "es"
 IDIOMA_DESTINO_POR_DEFECTO = "en"
 MODELO_WHISPER_POR_DEFECTO = "small"
 
+# ---------------------------------------------------------------------
+# Paleta de colores del proyecto: morado + blanco como colores
+# primordiales (pedido explicito), con buen contraste entre ellos. El
+# resto de tonos (grises/negros de apoyo) son de libre eleccion, elegidos
+# para que el morado y el blanco resalten sobre un fondo oscuro neutro.
+# ---------------------------------------------------------------------
+COLOR_MORADO = "#8B5CF6"          # morado principal (botones, acentos)
+COLOR_MORADO_OSCURO = "#6D28D9"   # morado mas oscuro (hover/realces)
+COLOR_MORADO_SUAVE = "#C4B5FD"    # morado claro (texto secundario sobre fondo oscuro)
+COLOR_BLANCO = "#FFFFFF"          # blanco principal (texto sobre morado/oscuro)
+COLOR_FONDO_VENTANA = "#151020"   # fondo general, casi negro con tinte morado
+COLOR_FONDO_PANEL = "#221A33"     # paneles/barras (un poco mas claro que el fondo)
+COLOR_FONDO_HISTORIAL = "#1B1428" # area de historial
+COLOR_BORDE_SUTIL = "#3B2E57"     # separadores/bordes suaves
+COLOR_TEXTO_TENUE = "#A9A0C4"     # texto secundario (menos protagonismo)
+COLOR_ESTADO_ACTIVO = "#22C55E"   # verde: "escuchando"
+COLOR_ESTADO_INACTIVO = "#A9A0C4"
+
 COLOR_FONDO_SUBTITULO = "#000000"
 COLOR_TEXTO_SUBTITULO = "#FFFFFF"
 TAMANO_FUENTE_SUBTITULO = 20
 
+# Ancho/alto minimos de la ventana: evita que, al achicarla, los botones
+# de las barras superiores queden ocultos fuera del area visible (tkinter
+# no los "envuelve" automaticamente a otra linea si no caben).
+ANCHO_MINIMO_VENTANA = 660
+ALTO_MINIMO_VENTANA = 420
+
 logger = logging.getLogger(__name__)
+
+
+def _configurar_identidad_app_windows() -> None:
+    """En Windows, si no se declara un "App User Model ID" propio, la
+    barra de tareas agrupa la ventana bajo el icono generico de Python en
+    vez del icono de la app (aunque la ventana en si ya lo muestre bien).
+    Esto lo corrige; en otros sistemas operativos no hace nada.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            "Hariment.ProyectoHariment.TraductorTiempoReal"
+        )
+    except Exception:
+        logger.debug("No se pudo fijar el AppUserModelID de Windows", exc_info=True)
 
 
 class AplicacionHariment:
     """Ventana principal de PROYECTO HARIMENT."""
 
     def __init__(self) -> None:
+        _configurar_identidad_app_windows()
+
         self._cola_eventos: "queue.Queue[SegmentoTranscrito]" = queue.Queue()
 
         self.gestor_configuracion = GestorConfiguracion()
@@ -83,13 +128,13 @@ class AplicacionHariment:
         # por defecto).
         self._region_captura = None
 
+        self._atajo_captura = self.configuracion.get("ocr", {}).get("atajo_captura", "<f9>")
+        self._listener_atajo = None
+
         self._construir_ventana()
         self._aplicar_estilo_subtitulo(self.configuracion.get("subtitulos", {}))
         self._actualizar_etiqueta_idiomas()
         self._programar_revision_de_cola()
-
-        self._atajo_captura = self.configuracion.get("ocr", {}).get("atajo_captura", "<f9>")
-        self._listener_atajo = None
         self._iniciar_atajo_global_captura()
 
     # ------------------------------------------------------------------
@@ -99,12 +144,15 @@ class AplicacionHariment:
     def _construir_ventana(self) -> None:
         if _TIENE_CUSTOMTKINTER:
             ctk.set_appearance_mode("dark")
+            ctk.set_default_color_theme("dark-blue")
             self.ventana = ctk.CTk()
         else:
             self.ventana = tk.Tk()
 
         self.ventana.title("PROYECTO HARIMENT — Traductor en tiempo real")
-        self.ventana.geometry("720x480")
+        self.ventana.geometry("760x540")
+        self.ventana.minsize(ANCHO_MINIMO_VENTANA, ALTO_MINIMO_VENTANA)
+        self.ventana.configure(bg=COLOR_FONDO_VENTANA)
         self.ventana.protocol("WM_DELETE_WINDOW", self._al_cerrar_ventana)
         self._aplicar_icono_ventana()
 
@@ -112,14 +160,14 @@ class AplicacionHariment:
         self._construir_historial()
         self._construir_barra_subtitulo()
 
-    def _aplicar_icono_ventana(self) -> None:
-        """Pone el icono de HARIMENT en la barra de titulo/barra de tareas.
+    def _cargar_imagen_icono(self):
+        """Carga (una sola vez) la imagen del icono de la app como
+        `tk.PhotoImage`, y la guarda en `self` para que Tk no la recolecte
+        como basura mientras la ventana este abierta (es un error comun:
+        si no se guarda una referencia, el icono desaparece o falla)."""
+        if getattr(self, "_imagen_icono", None) is not None:
+            return self._imagen_icono
 
-        Se usa el PNG (no el .ico) porque tkinter en Windows/Linux/macOS
-        lee PNG de forma nativa con `iconphoto`; el .ico solo hace falta
-        aparte para el ejecutable empaquetado con PyInstaller (ver
-        `scripts/build_windows.py`).
-        """
         import os
 
         ruta_icono = os.path.join(
@@ -129,41 +177,78 @@ class AplicacionHariment:
         try:
             if os.path.exists(ruta_icono):
                 self._imagen_icono = tk.PhotoImage(file=ruta_icono)
-                self.ventana.iconphoto(True, self._imagen_icono)
+                return self._imagen_icono
+        except Exception:
+            logger.warning("No se pudo cargar la imagen del icono", exc_info=True)
+        self._imagen_icono = None
+        return None
+
+    def _aplicar_icono_ventana(self, ventana=None) -> None:
+        """Pone el icono de HARIMENT en la barra de titulo/barra de tareas
+        de la ventana indicada (por defecto, la ventana principal).
+
+        Se usa el PNG (no el .ico) porque tkinter en Windows/Linux/macOS
+        lee PNG de forma nativa con `iconphoto`; el .ico solo hace falta
+        aparte para el ejecutable empaquetado con PyInstaller (ver
+        `scripts/build_windows.py`).
+        """
+        imagen = self._cargar_imagen_icono()
+        if imagen is None:
+            return
+        objetivo = ventana if ventana is not None else self.ventana
+        try:
+            objetivo.iconphoto(True, imagen)
         except Exception:
             logger.warning("No se pudo aplicar el icono de la ventana", exc_info=True)
 
     def _construir_barra_superior(self) -> None:
-        marco = self._marco(self.ventana)
-        marco.pack(fill="x", padx=10, pady=10)
+        """Construye la barra superior en DOS filas (en vez de una sola
+        fila muy ancha). Con una sola fila, al achicar la ventana los
+        botones de mas a la derecha quedaban fuera del area visible y
+        parecian "desaparecer"; repartidos en dos filas mas cortas caben
+        comodamente incluso en el ancho minimo de la ventana."""
+        contenedor = self._marco(self.ventana, color_fondo=COLOR_FONDO_PANEL)
+        contenedor.pack(fill="x")
 
+        fila_1 = self._marco(contenedor, color_fondo=COLOR_FONDO_PANEL)
+        fila_1.pack(fill="x", padx=10, pady=(10, 5))
+
+        fila_2 = self._marco(contenedor, color_fondo=COLOR_FONDO_PANEL)
+        fila_2.pack(fill="x", padx=10, pady=(0, 10))
+
+        # --- Fila 1: idiomas, iniciar/detener, estado, configuracion ---
         self.etiqueta_idiomas = self._etiqueta(
-            marco,
+            fila_1,
             texto=f"{IDIOMA_ORIGEN_POR_DEFECTO.upper()} → {IDIOMA_DESTINO_POR_DEFECTO.upper()}",
+            color=COLOR_MORADO_SUAVE,
+            negrita=True,
         )
-        self.etiqueta_idiomas.pack(side="left", padx=(0, 5))
+        self.etiqueta_idiomas.pack(side="left", padx=(0, 4))
 
         self.boton_invertir_idiomas = self._boton(
-            marco, texto="🔁", comando=self._invertir_idiomas
+            fila_1, texto="🔁", comando=self._invertir_idiomas, ancho=36
         )
-        self.boton_invertir_idiomas.pack(side="left", padx=(0, 20))
+        self.boton_invertir_idiomas.pack(side="left", padx=(0, 14))
 
         self.boton_iniciar_detener = self._boton(
-            marco, texto="▶ Iniciar", comando=self._alternar_escucha
+            fila_1, texto="▶ Iniciar", comando=self._alternar_escucha, primario=True
         )
         self.boton_iniciar_detener.pack(side="left")
 
-        self.etiqueta_estado = self._etiqueta(marco, texto="● Detenido", color="#AAAAAA")
-        self.etiqueta_estado.pack(side="right")
-
         self.boton_configuracion = self._boton(
-            marco, texto="⚙ Configuración", comando=self._abrir_configuracion
+            fila_1, texto="⚙ Configuración", comando=self._abrir_configuracion
         )
-        self.boton_configuracion.pack(side="right", padx=(0, 20))
+        self.boton_configuracion.pack(side="right")
 
+        self.etiqueta_estado = self._etiqueta(
+            fila_1, texto="● Detenido", color=COLOR_ESTADO_INACTIVO, negrita=True
+        )
+        self.etiqueta_estado.pack(side="right", padx=(0, 16))
+
+        # --- Fila 2: fuente de entrada, captura de pantalla, atajo ---
         self.variable_fuente = tk.StringVar(value=self._fuente_entrada)
-        marco_fuente = tk.Frame(marco, bg="#2B2B2B") if not _TIENE_CUSTOMTKINTER else self._marco(marco)
-        marco_fuente.pack(side="left", padx=(0, 20))
+        marco_fuente = self._marco(fila_2, color_fondo=COLOR_FONDO_PANEL)
+        marco_fuente.pack(side="left", padx=(0, 14))
         for etiqueta, valor in (("🎤 Micrófono", "microfono"), ("🔊 Audio del sistema", "sistema")):
             tk.Radiobutton(
                 marco_fuente,
@@ -171,34 +256,92 @@ class AplicacionHariment:
                 variable=self.variable_fuente,
                 value=valor,
                 command=self._cambiar_fuente_entrada,
-                bg="#2B2B2B",
-                fg="#FFFFFF",
-                selectcolor="#2B2B2B",
-                activebackground="#2B2B2B",
-                activeforeground="#FFFFFF",
+                bg=COLOR_FONDO_PANEL,
+                fg=COLOR_BLANCO,
+                selectcolor=COLOR_FONDO_PANEL,
+                activebackground=COLOR_FONDO_PANEL,
+                activeforeground=COLOR_MORADO_SUAVE,
+                highlightthickness=0,
+                borderwidth=0,
             ).pack(side="left")
 
         self.boton_capturar_pantalla = self._boton(
-            marco, texto="📷 Traducir pantalla", comando=self._capturar_y_traducir_pantalla
+            fila_2, texto="📷 Traducir pantalla", comando=self._capturar_y_traducir_pantalla
         )
-        self.boton_capturar_pantalla.pack(side="left", padx=(0, 5))
+        self.boton_capturar_pantalla.pack(side="left", padx=(0, 6))
 
         self.boton_elegir_region = self._boton(
-            marco, texto="🖼 Elegir área", comando=self._elegir_region_captura
+            fila_2, texto="🖼 Elegir área", comando=self._elegir_region_captura
         )
-        self.boton_elegir_region.pack(side="left", padx=(0, 20))
+        self.boton_elegir_region.pack(side="left", padx=(0, 14))
+
+        # Aviso permanente (tipo "chip") del atajo de teclado global
+        # configurado actualmente, para que el usuario no lo olvide ni
+        # tenga que adivinarlo mientras juega.
+        self.etiqueta_atajo = self._chip_atajo(fila_2)
+        self.etiqueta_atajo.pack(side="right")
+
+    def _chip_atajo(self, padre):
+        """Crea la pequeña "pastilla" que muestra el atajo de captura
+        actual (ej. "⌨ Captura: F9"), estilo notificacion permanente."""
+        texto_tecla = self._atajo_captura.strip("<>").upper()
+        marco = tk.Frame(padre, bg=COLOR_MORADO_OSCURO, highlightthickness=0)
+        tk.Label(
+            marco,
+            text=f"⌨ Captura: {texto_tecla}",
+            bg=COLOR_MORADO_OSCURO,
+            fg=COLOR_BLANCO,
+            font=("Segoe UI", 10, "bold"),
+            padx=10,
+            pady=4,
+        ).pack()
+        return marco
+
+    def _actualizar_chip_atajo(self) -> None:
+        """Reconstruye el chip del atajo (ej. tras cambiar la tecla en
+        Configuración), sin tener que reconstruir toda la barra."""
+        if not hasattr(self, "etiqueta_atajo"):
+            return
+        padre = self.etiqueta_atajo.master
+        self.etiqueta_atajo.destroy()
+        self.etiqueta_atajo = self._chip_atajo(padre)
+        self.etiqueta_atajo.pack(side="right")
 
     def _construir_historial(self) -> None:
         self.area_historial = scrolledtext.ScrolledText(
             self.ventana,
             wrap="word",
             height=15,
-            bg="#1E1E1E",
-            fg="#DDDDDD",
-            insertbackground="#DDDDDD",
+            bg=COLOR_FONDO_HISTORIAL,
+            fg=COLOR_BLANCO,
+            insertbackground=COLOR_BLANCO,
             borderwidth=0,
+            padx=12,
+            pady=10,
+            spacing1=2,
+            spacing3=10,  # espacio despues de cada parrafo: separa entradas
         )
         self.area_historial.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+        # Tags de formato: distinguen claramente la linea del idioma de
+        # origen (lo que se dijo/leyo) de la linea traducida, en vez de
+        # mostrar ambas mezcladas con el mismo color y tamaño.
+        self.area_historial.tag_configure(
+            "etiqueta_origen", foreground=COLOR_MORADO_SUAVE, font=("Segoe UI", 9, "bold")
+        )
+        self.area_historial.tag_configure(
+            "etiqueta_destino", foreground=COLOR_BLANCO, font=("Segoe UI", 9, "bold")
+        )
+        self.area_historial.tag_configure(
+            "texto_origen", foreground=COLOR_TEXTO_TENUE, font=("Segoe UI", 11)
+        )
+        self.area_historial.tag_configure(
+            "texto_destino", foreground=COLOR_BLANCO, font=("Segoe UI", 12, "bold")
+        )
+        self.area_historial.tag_configure(
+            "separador", foreground=COLOR_BORDE_SUTIL, font=("Segoe UI", 8)
+        )
+
         self.area_historial.configure(state="disabled")
 
     def _construir_barra_subtitulo(self) -> None:
@@ -212,9 +355,13 @@ class AplicacionHariment:
         self.marco_subtitulo.pack(fill="x", side="bottom")
         self.marco_subtitulo.pack_propagate(False)
 
+        texto_tecla = self._atajo_captura.strip("<>").upper()
         self.etiqueta_subtitulo = tk.Label(
             self.marco_subtitulo,
-            text="Presiona “Iniciar” y habla en español…",
+            text=(
+                "Presiona “Iniciar” y habla en español…  "
+                f"(atajo de captura de pantalla: {texto_tecla})"
+            ),
             bg=COLOR_FONDO_SUBTITULO,
             fg=COLOR_TEXTO_SUBTITULO,
             font=("Segoe UI", TAMANO_FUENTE_SUBTITULO),
@@ -225,18 +372,55 @@ class AplicacionHariment:
 
     # Pequeños helpers para no repetir el if/else de customtkinter en cada widget.
 
-    def _marco(self, padre):
-        return ctk.CTkFrame(padre) if _TIENE_CUSTOMTKINTER else tk.Frame(padre, bg="#2B2B2B")
-
-    def _etiqueta(self, padre, texto: str, color: str = "#FFFFFF"):
+    def _marco(self, padre, color_fondo: str = COLOR_FONDO_VENTANA):
         if _TIENE_CUSTOMTKINTER:
-            return ctk.CTkLabel(padre, text=texto)
-        return tk.Label(padre, text=texto, bg="#2B2B2B", fg=color)
+            return ctk.CTkFrame(padre, fg_color=color_fondo)
+        return tk.Frame(padre, bg=color_fondo)
 
-    def _boton(self, padre, texto: str, comando):
+    def _etiqueta(self, padre, texto: str, color: str = COLOR_BLANCO, negrita: bool = False):
         if _TIENE_CUSTOMTKINTER:
-            return ctk.CTkButton(padre, text=texto, command=comando)
-        return tk.Button(padre, text=texto, command=comando)
+            fuente = ("Segoe UI", 12, "bold") if negrita else None
+            return ctk.CTkLabel(padre, text=texto, text_color=color, font=fuente)
+        fuente = ("Segoe UI", 10, "bold") if negrita else ("Segoe UI", 10)
+        return tk.Label(padre, text=texto, bg=COLOR_FONDO_PANEL, fg=color, font=fuente)
+
+    def _boton(self, padre, texto: str, comando, primario: bool = False, ancho: int | None = None):
+        """Boton con la paleta morado/blanco: los botones "primarios"
+        (ej. Iniciar/Detener) usan morado solido con texto blanco; el
+        resto usa un morado mas discreto para no competir visualmente."""
+        color_fondo = COLOR_MORADO if primario else COLOR_FONDO_HISTORIAL
+        color_borde = COLOR_MORADO
+        if _TIENE_CUSTOMTKINTER:
+            return ctk.CTkButton(
+                padre,
+                text=texto,
+                command=comando,
+                fg_color=color_fondo,
+                hover_color=COLOR_MORADO_OSCURO,
+                text_color=COLOR_BLANCO,
+                border_color=color_borde,
+                border_width=1 if not primario else 0,
+                width=ancho or 140,
+            )
+        boton = tk.Button(
+            padre,
+            text=texto,
+            command=comando,
+            bg=color_fondo,
+            fg=COLOR_BLANCO,
+            activebackground=COLOR_MORADO_OSCURO,
+            activeforeground=COLOR_BLANCO,
+            relief="flat",
+            highlightthickness=1,
+            highlightbackground=color_borde,
+            highlightcolor=color_borde,
+            padx=10,
+            pady=4,
+            cursor="hand2",
+        )
+        if ancho:
+            boton.configure(width=3)
+        return boton
 
     # ------------------------------------------------------------------
     # Logica de la aplicacion
@@ -256,14 +440,14 @@ class AplicacionHariment:
 
     def _actualizar_estado(self, escuchando: bool) -> None:
         if escuchando:
-            texto_estado, color_estado = "● Escuchando", "#4CAF50"
+            texto_estado, color_estado = "● Escuchando", COLOR_ESTADO_ACTIVO
             texto_boton = "■ Detener"
         else:
-            texto_estado, color_estado = "● Detenido", "#AAAAAA"
+            texto_estado, color_estado = "● Detenido", COLOR_ESTADO_INACTIVO
             texto_boton = "▶ Iniciar"
 
         if _TIENE_CUSTOMTKINTER:
-            self.etiqueta_estado.configure(text=texto_estado)
+            self.etiqueta_estado.configure(text=texto_estado, text_color=color_estado)
         else:
             self.etiqueta_estado.configure(text=texto_estado, fg=color_estado)
 
@@ -286,11 +470,22 @@ class AplicacionHariment:
         resultado = self.traductor.traducir(segmento.texto)
 
         self.etiqueta_subtitulo.configure(text=resultado.texto_traducido)
+        self._agregar_al_historial(resultado)
+
+    def _agregar_al_historial(self, resultado) -> None:
+        """Agrega una entrada al historial con formato claro: la linea del
+        idioma de origen y la traducida quedan visualmente separadas (con
+        etiquetas de color distinto y un pequeño divisor), en vez de texto
+        plano donde ambos idiomas se mezclan y confunden."""
+        origen = resultado.idioma_origen.upper()
+        destino = resultado.idioma_destino.upper()
 
         self.area_historial.configure(state="normal")
-        self.area_historial.insert(
-            "end", f"ES: {resultado.texto_original}\nEN: {resultado.texto_traducido}\n\n"
-        )
+        self.area_historial.insert("end", f"{origen}  ", "etiqueta_origen")
+        self.area_historial.insert("end", f"{resultado.texto_original}\n", "texto_origen")
+        self.area_historial.insert("end", f"{destino}  ", "etiqueta_destino")
+        self.area_historial.insert("end", f"{resultado.texto_traducido}\n", "texto_destino")
+        self.area_historial.insert("end", "─" * 60 + "\n", "separador")
         self.area_historial.see("end")
         self.area_historial.configure(state="disabled")
 
@@ -393,11 +588,14 @@ class AplicacionHariment:
             self.ventana.after(0, lambda: self.etiqueta_subtitulo.configure(text=mensaje))
 
     def _abrir_configuracion(self) -> None:
-        crear_ventana_configuracion(
+        ventana_configuracion = crear_ventana_configuracion(
             self.ventana,
             configuracion_actual=self.configuracion,
             al_guardar=self._aplicar_configuracion,
         )
+        # Misma imagen de icono que la ventana principal (no solo la
+        # ventana principal debe mostrar el icono de HARIMENT).
+        self._aplicar_icono_ventana(ventana_configuracion)
 
     def _aplicar_configuracion(self, nueva_configuracion: dict) -> None:
         """Aplica en caliente los cambios hechos en la ventana de configuracion
@@ -447,9 +645,14 @@ class AplicacionHariment:
         self.marco_subtitulo.pack(fill="x", side="top" if posicion == "superior" else "bottom")
 
     def _actualizar_etiqueta_idiomas(self) -> None:
-        self.etiqueta_idiomas.configure(
-            text=f"{self.traductor.idioma_origen.upper()} → {self.traductor.idioma_destino.upper()}"
-        )
+        if _TIENE_CUSTOMTKINTER:
+            self.etiqueta_idiomas.configure(
+                text=f"{self.traductor.idioma_origen.upper()} → {self.traductor.idioma_destino.upper()}"
+            )
+        else:
+            self.etiqueta_idiomas.configure(
+                text=f"{self.traductor.idioma_origen.upper()} → {self.traductor.idioma_destino.upper()}"
+            )
 
     def _iniciar_atajo_global_captura(self) -> None:
         """Registra una tecla rapida global (por defecto F9) para disparar

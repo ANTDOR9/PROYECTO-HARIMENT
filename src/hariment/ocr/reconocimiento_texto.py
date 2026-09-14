@@ -71,9 +71,16 @@ def _configurar_ruta_tesseract(pytesseract_modulo) -> None:
         return
     _ruta_tesseract_configurada = True
 
+    # Acceso defensivo: en los tests, `pytesseract` se reemplaza por un
+    # modulo de prueba simplificado que no tiene esta sub-estructura; en
+    # ese caso no hay nada que auto-detectar y se sigue de largo.
+    submodulo = getattr(pytesseract_modulo, "pytesseract", None)
+    if submodulo is None:
+        return
+
     import shutil
 
-    if shutil.which(pytesseract_modulo.pytesseract.tesseract_cmd or "tesseract"):
+    if shutil.which(getattr(submodulo, "tesseract_cmd", None) or "tesseract"):
         return
 
     import os

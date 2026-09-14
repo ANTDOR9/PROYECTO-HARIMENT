@@ -35,6 +35,14 @@ RUTA_CONFIG_EJEMPLO = os.path.join(RAIZ_PROYECTO, "assets", "config", "settings.
 
 POSICIONES_SUBTITULO = ["superior", "inferior"]
 
+# Misma paleta morado/blanco que la ventana principal (hariment.gui.app),
+# para que la ventana de configuracion no desentone visualmente.
+_COLOR_MORADO = "#8B5CF6"
+_COLOR_MORADO_OSCURO = "#6D28D9"
+_COLOR_BLANCO = "#FFFFFF"
+_COLOR_FONDO = "#151020"
+_COLOR_FONDO_CAMPO = "#221A33"
+
 # Nombres amigables para mostrar en la interfaz, mapeados al codigo real.
 NOMBRES_IDIOMA = {
     "es": "Español",
@@ -80,7 +88,7 @@ def crear_ventana_configuracion(padre, configuracion_actual: dict, al_guardar: C
             self.title("Configuración — PROYECTO HARIMENT")
             self.geometry("420x520")
             self.resizable(False, False)
-            self.configure(bg="#2B2B2B")
+            self.configure(bg=_COLOR_FONDO)
 
             self._configuracion = configuracion_actual
             self._al_guardar = al_guardar
@@ -97,7 +105,7 @@ def crear_ventana_configuracion(padre, configuracion_actual: dict, al_guardar: C
             pares_soportados = idiomas_soportados()
             idiomas_origen_disponibles = sorted({origen for origen, _ in pares_soportados})
 
-            tk.Label(marco, text="Idioma de origen:", bg="#2B2B2B", fg="#FFFFFF").pack(anchor="w")
+            tk.Label(marco, text="Idioma de origen:", bg=_COLOR_FONDO, fg="#FFFFFF").pack(anchor="w")
             self.variable_idioma_origen = tk.StringVar(value=self._configuracion.get("idioma_origen", "es"))
             combo_origen = ttk.Combobox(
                 marco,
@@ -108,7 +116,7 @@ def crear_ventana_configuracion(padre, configuracion_actual: dict, al_guardar: C
             combo_origen.pack(fill="x", pady=(0, 10))
             combo_origen.bind("<<ComboboxSelected>>", lambda _evento: self._actualizar_destinos_disponibles())
 
-            tk.Label(marco, text="Idioma de destino:", bg="#2B2B2B", fg="#FFFFFF").pack(anchor="w")
+            tk.Label(marco, text="Idioma de destino:", bg=_COLOR_FONDO, fg="#FFFFFF").pack(anchor="w")
             self.variable_idioma_destino = tk.StringVar(value=self._configuracion.get("idioma_destino", "en"))
             self.combo_destino = ttk.Combobox(marco, textvariable=self.variable_idioma_destino, state="readonly")
             self.combo_destino.pack(fill="x")
@@ -127,7 +135,7 @@ def crear_ventana_configuracion(padre, configuracion_actual: dict, al_guardar: C
             marco = self._marco_titulado("Subtítulos")
             subtitulos = self._configuracion.get("subtitulos", {})
 
-            tk.Label(marco, text="Posición:", bg="#2B2B2B", fg="#FFFFFF").pack(anchor="w")
+            tk.Label(marco, text="Posición:", bg=_COLOR_FONDO, fg="#FFFFFF").pack(anchor="w")
             self.variable_posicion = tk.StringVar(value=subtitulos.get("posicion", "inferior"))
             ttk.Combobox(
                 marco,
@@ -136,38 +144,59 @@ def crear_ventana_configuracion(padre, configuracion_actual: dict, al_guardar: C
                 state="readonly",
             ).pack(fill="x", pady=(0, 10))
 
-            tk.Label(marco, text="Tamaño de fuente:", bg="#2B2B2B", fg="#FFFFFF").pack(anchor="w")
+            tk.Label(marco, text="Tamaño de fuente:", bg=_COLOR_FONDO, fg="#FFFFFF").pack(anchor="w")
             self.variable_tamano_fuente = tk.IntVar(value=subtitulos.get("tamano_fuente", 24))
             tk.Scale(
                 marco, from_=12, to=48, orient="horizontal", variable=self.variable_tamano_fuente,
-                bg="#2B2B2B", fg="#FFFFFF", highlightthickness=0, troughcolor="#444444",
+                bg=_COLOR_FONDO, fg="#FFFFFF", highlightthickness=0, troughcolor=_COLOR_MORADO_OSCURO,
             ).pack(fill="x", pady=(0, 10))
 
-            tk.Label(marco, text="Color de texto (hex):", bg="#2B2B2B", fg="#FFFFFF").pack(anchor="w")
+            tk.Label(marco, text="Color de texto (hex):", bg=_COLOR_FONDO, fg="#FFFFFF").pack(anchor="w")
             self.variable_color_texto = tk.StringVar(value=subtitulos.get("color_texto", "#FFFFFF"))
-            tk.Entry(marco, textvariable=self.variable_color_texto).pack(fill="x", pady=(0, 10))
+            tk.Entry(
+                marco, textvariable=self.variable_color_texto,
+                bg=_COLOR_FONDO_CAMPO, fg=_COLOR_BLANCO, insertbackground=_COLOR_BLANCO,
+                relief="flat", highlightthickness=1, highlightbackground=_COLOR_MORADO,
+            ).pack(fill="x", pady=(0, 10))
 
-            tk.Label(marco, text="Color de fondo (hex):", bg="#2B2B2B", fg="#FFFFFF").pack(anchor="w")
+            tk.Label(marco, text="Color de fondo (hex):", bg=_COLOR_FONDO, fg="#FFFFFF").pack(anchor="w")
             self.variable_color_fondo = tk.StringVar(value=subtitulos.get("color_fondo", "#000000"))
-            tk.Entry(marco, textvariable=self.variable_color_fondo).pack(fill="x", pady=(0, 10))
+            tk.Entry(
+                marco, textvariable=self.variable_color_fondo,
+                bg=_COLOR_FONDO_CAMPO, fg=_COLOR_BLANCO, insertbackground=_COLOR_BLANCO,
+                relief="flat", highlightthickness=1, highlightbackground=_COLOR_MORADO,
+            ).pack(fill="x", pady=(0, 10))
 
-            tk.Label(marco, text="Tiempo de permanencia (segundos):", bg="#2B2B2B", fg="#FFFFFF").pack(anchor="w")
+            tk.Label(marco, text="Tiempo de permanencia (segundos):", bg=_COLOR_FONDO, fg="#FFFFFF").pack(anchor="w")
             self.variable_tiempo_permanencia = tk.IntVar(value=subtitulos.get("tiempo_permanencia_segundos", 4))
             tk.Scale(
                 marco, from_=1, to=15, orient="horizontal", variable=self.variable_tiempo_permanencia,
-                bg="#2B2B2B", fg="#FFFFFF", highlightthickness=0, troughcolor="#444444",
+                bg=_COLOR_FONDO, fg="#FFFFFF", highlightthickness=0, troughcolor=_COLOR_MORADO_OSCURO,
             ).pack(fill="x")
 
         def _construir_botones(self) -> None:
-            marco = tk.Frame(self, bg="#2B2B2B")
+            marco = tk.Frame(self, bg=_COLOR_FONDO)
             marco.pack(fill="x", padx=15, pady=15)
 
-            tk.Button(marco, text="Cancelar", command=self.destroy).pack(side="right", padx=(10, 0))
-            tk.Button(marco, text="Guardar", command=self._guardar_y_cerrar).pack(side="right")
+            tk.Button(
+                marco, text="Cancelar", command=self.destroy,
+                bg=_COLOR_FONDO_CAMPO, fg=_COLOR_BLANCO, activebackground=_COLOR_MORADO_OSCURO,
+                activeforeground=_COLOR_BLANCO, relief="flat",
+                highlightthickness=1, highlightbackground=_COLOR_MORADO, padx=14, pady=6, cursor="hand2",
+            ).pack(side="right", padx=(10, 0))
+            tk.Button(
+                marco, text="Guardar", command=self._guardar_y_cerrar,
+                bg=_COLOR_MORADO, fg=_COLOR_BLANCO, activebackground=_COLOR_MORADO_OSCURO,
+                activeforeground=_COLOR_BLANCO, relief="flat",
+                highlightthickness=0, padx=14, pady=6, cursor="hand2",
+            ).pack(side="right")
 
         def _marco_titulado(self, titulo: str):
             contenedor = tk.LabelFrame(
-                self, text=titulo, bg="#2B2B2B", fg="#FFFFFF", labelanchor="nw", padx=10, pady=10
+                self, text=titulo, bg=_COLOR_FONDO, fg=_COLOR_MORADO,
+                labelanchor="nw", padx=10, pady=10,
+                highlightbackground=_COLOR_MORADO_OSCURO, highlightthickness=1,
+                font=("Segoe UI", 10, "bold"),
             )
             contenedor.pack(fill="x", padx=15, pady=(15, 0))
             return contenedor
