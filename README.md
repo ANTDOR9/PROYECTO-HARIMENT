@@ -166,3 +166,7 @@ carpeta (`--onedir`) en vez de un solo archivo porque Whisper y
 ## Licencia
 
 Por definir.
+
+## Sesión de pruebas
+
+![Prueba 1](assets/pruebas/prueba%201.png)
