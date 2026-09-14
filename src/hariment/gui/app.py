@@ -34,6 +34,7 @@ except ImportError:  # pragma: no cover - depende de si esta instalado
     _TIENE_CUSTOMTKINTER = False
 
 from hariment.audio.microfono import SegmentoTranscrito, TranscriptorMicrofono
+from hariment.gui.configuracion import GestorConfiguracion, crear_ventana_configuracion
 from hariment.translation.traductor import Traductor
 
 # Valores por defecto (alineados con assets/config/settings.example.json).
@@ -53,17 +54,22 @@ class AplicacionHariment:
     def __init__(self) -> None:
         self._cola_eventos: "queue.Queue[SegmentoTranscrito]" = queue.Queue()
 
-        self.traductor = Traductor(
-            idioma_origen=IDIOMA_ORIGEN_POR_DEFECTO,
-            idioma_destino=IDIOMA_DESTINO_POR_DEFECTO,
-        )
+        self.gestor_configuracion = GestorConfiguracion()
+        self.configuracion = self.gestor_configuracion.cargar()
+
+        idioma_origen = self.configuracion.get("idioma_origen", IDIOMA_ORIGEN_POR_DEFECTO)
+        idioma_destino = self.configuracion.get("idioma_destino", IDIOMA_DESTINO_POR_DEFECTO)
+
+        self.traductor = Traductor(idioma_origen=idioma_origen, idioma_destino=idioma_destino)
         self.transcriptor = TranscriptorMicrofono(
-            idioma=IDIOMA_ORIGEN_POR_DEFECTO,
+            idioma=idioma_origen,
             modelo=MODELO_WHISPER_POR_DEFECTO,
             al_transcribir=self._cola_eventos.put,  # llamado desde el hilo de audio
         )
 
         self._construir_ventana()
+        self._aplicar_estilo_subtitulo(self.configuracion.get("subtitulos", {}))
+        self._actualizar_etiqueta_idiomas()
         self._programar_revision_de_cola()
 
     # ------------------------------------------------------------------
@@ -102,6 +108,11 @@ class AplicacionHariment:
 
         self.etiqueta_estado = self._etiqueta(marco, texto="● Detenido", color="#AAAAAA")
         self.etiqueta_estado.pack(side="right")
+
+        self.boton_configuracion = self._boton(
+            marco, texto="⚙ Configuración", comando=self._abrir_configuracion
+        )
+        self.boton_configuracion.pack(side="right", padx=(0, 20))
 
     def _construir_historial(self) -> None:
         self.area_historial = scrolledtext.ScrolledText(
@@ -204,6 +215,46 @@ class AplicacionHariment:
         )
         self.area_historial.see("end")
         self.area_historial.configure(state="disabled")
+
+    def _abrir_configuracion(self) -> None:
+        crear_ventana_configuracion(
+            self.ventana,
+            configuracion_actual=self.configuracion,
+            al_guardar=self._aplicar_configuracion,
+        )
+
+    def _aplicar_configuracion(self, nueva_configuracion: dict) -> None:
+        """Aplica en caliente los cambios hechos en la ventana de configuracion
+        y los guarda en disco para la proxima vez que se abra la aplicacion."""
+        self.configuracion = nueva_configuracion
+        self.gestor_configuracion.guardar(nueva_configuracion)
+
+        idioma_origen = nueva_configuracion.get("idioma_origen", IDIOMA_ORIGEN_POR_DEFECTO)
+        idioma_destino = nueva_configuracion.get("idioma_destino", IDIOMA_DESTINO_POR_DEFECTO)
+
+        self.traductor.cambiar_idiomas(idioma_origen, idioma_destino)
+        self.transcriptor.idioma = idioma_origen  # se aplica en la proxima frase transcrita
+
+        self._aplicar_estilo_subtitulo(nueva_configuracion.get("subtitulos", {}))
+        self._actualizar_etiqueta_idiomas()
+
+    def _aplicar_estilo_subtitulo(self, subtitulos: dict) -> None:
+        color_fondo = subtitulos.get("color_fondo", COLOR_FONDO_SUBTITULO)
+        color_texto = subtitulos.get("color_texto", COLOR_TEXTO_SUBTITULO)
+        tamano_fuente = subtitulos.get("tamano_fuente", TAMANO_FUENTE_SUBTITULO)
+        posicion = subtitulos.get("posicion", "inferior")
+
+        self.marco_subtitulo.configure(bg=color_fondo)
+        self.etiqueta_subtitulo.configure(
+            bg=color_fondo, fg=color_texto, font=("Segoe UI", tamano_fuente)
+        )
+        self.marco_subtitulo.pack_forget()
+        self.marco_subtitulo.pack(fill="x", side="top" if posicion == "superior" else "bottom")
+
+    def _actualizar_etiqueta_idiomas(self) -> None:
+        self.etiqueta_idiomas.configure(
+            text=f"{self.traductor.idioma_origen.upper()} → {self.traductor.idioma_destino.upper()}"
+        )
 
     def _al_cerrar_ventana(self) -> None:
         self.transcriptor.detener()

@@ -12,7 +12,7 @@ Integración de `openai-whisper` para transcribir el micrófono en tiempo real y
 ## Etapa 4 — Interfaz gráfica mínima con subtítulos ✅
 Ventana de escritorio (`customtkinter`/`tkinter`) que muestra el texto transcrito y traducido como subtítulo. Botones básicos de iniciar/detener.
 
-## Etapa 5 — Configuración de subtítulos e idiomas
+## Etapa 5 — Configuración de subtítulos e idiomas ✅
 Panel de configuración: posición/estilo de subtítulos, selección de idioma de entrada y salida, detección automática de idioma.
 
 ## Etapa 6 — Audio del sistema (loopback)
