@@ -1,5 +1,7 @@
 # Reconocimiento de voz
 openai-whisper
+sounddevice
+numpy
 
 # Traducción y OCR con IA
 transformers

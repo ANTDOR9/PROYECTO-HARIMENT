@@ -6,7 +6,7 @@ Estructura de carpetas, entorno virtual, dependencias iniciales, README y contro
 ## Etapa 2 — Núcleo de traducción de texto ✅
 Integración de `transformers` (modelo Helsinki-NLP u otro) para traducir texto español → inglés. Sin interfaz todavía, probado por consola/scripts.
 
-## Etapa 3 — Reconocimiento de voz por micrófono
+## Etapa 3 — Reconocimiento de voz por micrófono ✅
 Integración de `openai-whisper` para transcribir el micrófono en tiempo real y conectarlo con el núcleo de traducción de la Etapa 2.
 
 ## Etapa 4 — Interfaz gráfica mínima con subtítulos
