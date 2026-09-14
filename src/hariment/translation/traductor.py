@@ -118,35 +118,50 @@ class Traductor:
         )
 
 
+class _TraductorManual:
+    """Envoltura minima que imita la interfaz de un pipeline de `transformers`
+    (`pipeline_traduccion(texto)` -> `[{"translation_text": "..."}]`), pero
+    llamando al modelo y al tokenizer directamente.
+
+    Se hizo asi -en vez de usar `transformers.pipeline("translation", ...)`
+    o `TranslationPipeline`- porque esas dos APIs de alto nivel han ido
+    cambiando de forma incompatible entre versiones de `transformers`
+    (algunas no registran la tarea "translation" ni con el formato
+    "translation_XX_to_YY", y otras ni siquiera exportan la clase
+    `TranslationPipeline`). Cargar el modelo y el tokenizer con las clases
+    `AutoModelForSeq2SeqLM`/`AutoTokenizer` y llamar `.generate()` a mano es
+    una API mucho mas estable entre versiones.
+    """
+
+    def __init__(self, modelo, tokenizador) -> None:
+        self._modelo = modelo
+        self._tokenizador = tokenizador
+
+    def __call__(self, texto: str):
+        entradas = self._tokenizador(texto, return_tensors="pt", truncation=True)
+        tokens_generados = self._modelo.generate(**entradas, max_new_tokens=512)
+        texto_traducido = self._tokenizador.decode(tokens_generados[0], skip_special_tokens=True)
+        return [{"translation_text": texto_traducido}]
+
+
 @lru_cache(maxsize=8)
 def _cargar_pipeline_traduccion(nombre_modelo: str, idioma_origen: str, idioma_destino: str):
-    """Carga (y cachea en memoria) un pipeline de traduccion de `transformers`.
+    """Carga (y cachea en memoria) el modelo y tokenizer de traduccion.
 
     Separado en una funcion con cache propia para que, si la aplicacion
     cambia de par de idiomas y luego vuelve al anterior, no se vuelva a
-    descargar/cargar el mismo modelo dos veces.
-
-    Se usa el formato de tarea "translation_XX_to_YY" (en vez del alias
-    generico "translation") porque versiones recientes de `transformers`
-    dejaron de registrar ese alias corto; el formato con los codigos de
-    idioma si sigue soportado en todas las versiones.
+    descargar/cargar el mismo modelo dos veces. `idioma_origen`/`idioma_destino`
+    solo se usan como parte de la clave de cache (distintos pares -> distinta
+    entrada), no se le pasan al modelo.
     """
-    from transformers import pipeline  # import perezoso: evita cargar torch/transformers
-    # si este modulo se importa pero nunca se usa (por ejemplo en tests que
-    # solo revisan la configuracion de idiomas).
+    # Import perezoso: evita cargar torch/transformers si este modulo se
+    # importa pero nunca se usa (por ejemplo en tests que solo revisan la
+    # configuracion de idiomas).
+    from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
-    tarea = f"translation_{idioma_origen}_to_{idioma_destino}"
-    try:
-        return pipeline(tarea, model=nombre_modelo)
-    except KeyError:
-        # Fallback por si alguna version futura tampoco reconoce ese
-        # formato: se arma el pipeline "a mano" indicando el modelo y su
-        # propio tokenizer, sin depender del registro de tareas de texto.
-        from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, TranslationPipeline
-
-        modelo = AutoModelForSeq2SeqLM.from_pretrained(nombre_modelo)
-        tokenizador = AutoTokenizer.from_pretrained(nombre_modelo)
-        return TranslationPipeline(model=modelo, tokenizer=tokenizador)
+    modelo = AutoModelForSeq2SeqLM.from_pretrained(nombre_modelo)
+    tokenizador = AutoTokenizer.from_pretrained(nombre_modelo)
+    return _TraductorManual(modelo, tokenizador)
 
 
 def idiomas_soportados() -> list[tuple[str, str]]:
