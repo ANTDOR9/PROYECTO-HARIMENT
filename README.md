@@ -1,4 +1,8 @@
+<img src="assets/icons/icono_readme.png" alt="Icono de PROYECTO HARIMENT" width="72" align="left" />
+
 # PROYECTO HARIMENT
+
+<br clear="left"/>
 
 Software de traducción y asistencia de idiomas en tiempo real. Escucha, reconoce y traduce voz, audio del sistema y texto en pantalla, mostrando el resultado como subtítulos configurables.
 

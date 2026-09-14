@@ -106,10 +106,32 @@ class AplicacionHariment:
         self.ventana.title("PROYECTO HARIMENT — Traductor en tiempo real")
         self.ventana.geometry("720x480")
         self.ventana.protocol("WM_DELETE_WINDOW", self._al_cerrar_ventana)
+        self._aplicar_icono_ventana()
 
         self._construir_barra_superior()
         self._construir_historial()
         self._construir_barra_subtitulo()
+
+    def _aplicar_icono_ventana(self) -> None:
+        """Pone el icono de HARIMENT en la barra de titulo/barra de tareas.
+
+        Se usa el PNG (no el .ico) porque tkinter en Windows/Linux/macOS
+        lee PNG de forma nativa con `iconphoto`; el .ico solo hace falta
+        aparte para el ejecutable empaquetado con PyInstaller (ver
+        `scripts/build_windows.py`).
+        """
+        import os
+
+        ruta_icono = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
+            "assets", "icons", "icono_app.png",
+        )
+        try:
+            if os.path.exists(ruta_icono):
+                self._imagen_icono = tk.PhotoImage(file=ruta_icono)
+                self.ventana.iconphoto(True, self._imagen_icono)
+        except Exception:
+            logger.warning("No se pudo aplicar el icono de la ventana", exc_info=True)
 
     def _construir_barra_superior(self) -> None:
         marco = self._marco(self.ventana)
