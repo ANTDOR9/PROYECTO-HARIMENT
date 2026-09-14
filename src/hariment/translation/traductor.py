@@ -82,7 +82,9 @@ class Traductor:
 
     def _obtener_pipeline(self):
         if self._pipeline is None:
-            self._pipeline = _cargar_pipeline_traduccion(self._nombre_modelo())
+            self._pipeline = _cargar_pipeline_traduccion(
+                self._nombre_modelo(), self.idioma_origen, self.idioma_destino
+            )
         return self._pipeline
 
     def cambiar_idiomas(self, idioma_origen: str, idioma_destino: str) -> None:
@@ -117,18 +119,34 @@ class Traductor:
 
 
 @lru_cache(maxsize=8)
-def _cargar_pipeline_traduccion(nombre_modelo: str):
+def _cargar_pipeline_traduccion(nombre_modelo: str, idioma_origen: str, idioma_destino: str):
     """Carga (y cachea en memoria) un pipeline de traduccion de `transformers`.
 
     Separado en una funcion con cache propia para que, si la aplicacion
     cambia de par de idiomas y luego vuelve al anterior, no se vuelva a
     descargar/cargar el mismo modelo dos veces.
+
+    Se usa el formato de tarea "translation_XX_to_YY" (en vez del alias
+    generico "translation") porque versiones recientes de `transformers`
+    dejaron de registrar ese alias corto; el formato con los codigos de
+    idioma si sigue soportado en todas las versiones.
     """
     from transformers import pipeline  # import perezoso: evita cargar torch/transformers
     # si este modulo se importa pero nunca se usa (por ejemplo en tests que
     # solo revisan la configuracion de idiomas).
 
-    return pipeline("translation", model=nombre_modelo)
+    tarea = f"translation_{idioma_origen}_to_{idioma_destino}"
+    try:
+        return pipeline(tarea, model=nombre_modelo)
+    except KeyError:
+        # Fallback por si alguna version futura tampoco reconoce ese
+        # formato: se arma el pipeline "a mano" indicando el modelo y su
+        # propio tokenizer, sin depender del registro de tareas de texto.
+        from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, TranslationPipeline
+
+        modelo = AutoModelForSeq2SeqLM.from_pretrained(nombre_modelo)
+        tokenizador = AutoTokenizer.from_pretrained(nombre_modelo)
+        return TranslationPipeline(model=modelo, tokenizer=tokenizador)
 
 
 def idiomas_soportados() -> list[tuple[str, str]]:
