@@ -1,9 +1,9 @@
 # Etapas del proyecto
 
-## Etapa 1 — Configuración base del proyecto
+## Etapa 1 — Configuración base del proyecto ✅
 Estructura de carpetas, entorno virtual, dependencias iniciales, README y control de versiones (Git/GitHub).
 
-## Etapa 2 — Núcleo de traducción de texto
+## Etapa 2 — Núcleo de traducción de texto ✅
 Integración de `transformers` (modelo Helsinki-NLP u otro) para traducir texto español → inglés. Sin interfaz todavía, probado por consola/scripts.
 
 ## Etapa 3 — Reconocimiento de voz por micrófono

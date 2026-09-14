@@ -16,6 +16,8 @@ models_cache/
 # Configuración local del usuario
 assets/config/settings.json
 
+.pytest_cache/
+
 # Sistema
 .DS_Store
 Thumbs.db
