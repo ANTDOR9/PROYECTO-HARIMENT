@@ -24,3 +24,6 @@ customtkinter
 fastapi
 uvicorn[standard]
 python-multipart  # requerido por FastAPI para subir archivos (audio en /audio/transcribir)
+
+# Empaquetado (solo para generar el .exe de Windows, no en produccion)
+pyinstaller

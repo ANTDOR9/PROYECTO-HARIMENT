@@ -22,6 +22,7 @@ mientras se transcribe o traduce.
 
 from __future__ import annotations
 
+import logging
 import queue
 import threading
 import tkinter as tk
@@ -53,6 +54,8 @@ MODELO_WHISPER_POR_DEFECTO = "small"
 COLOR_FONDO_SUBTITULO = "#000000"
 COLOR_TEXTO_SUBTITULO = "#FFFFFF"
 TAMANO_FUENTE_SUBTITULO = 20
+
+logger = logging.getLogger(__name__)
 
 
 class AplicacionHariment:
@@ -207,6 +210,7 @@ class AplicacionHariment:
                 self.transcriptor.iniciar()
                 self._actualizar_estado(escuchando=True)
             except DispositivoLoopbackNoDisponibleError as error:
+                logger.warning("Dispositivo de loopback no disponible: %s", error)
                 self.etiqueta_subtitulo.configure(text=str(error))
 
     def _actualizar_estado(self, escuchando: bool) -> None:
@@ -285,6 +289,7 @@ class AplicacionHariment:
                 self.transcriptor.iniciar()
                 self._actualizar_estado(escuchando=True)
             except DispositivoLoopbackNoDisponibleError as error:
+                logger.warning("Dispositivo de loopback no disponible: %s", error)
                 self._actualizar_estado(escuchando=False)
                 self.etiqueta_subtitulo.configure(text=str(error))
 
@@ -305,6 +310,7 @@ class AplicacionHariment:
             imagen = capturar_pantalla()
             texto = self.reconocedor_texto.reconocer(imagen, idioma=self.traductor.idioma_origen)
         except Exception as error:  # se informa el error en vez de dejar la app colgada
+            logger.exception("Fallo la captura/reconocimiento de pantalla")
             mensaje = f"No se pudo capturar/reconocer la pantalla: {error}"
             self.ventana.after(0, lambda: self.etiqueta_subtitulo.configure(text=mensaje))
             return

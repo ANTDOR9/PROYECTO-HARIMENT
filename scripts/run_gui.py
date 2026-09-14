@@ -12,7 +12,9 @@ import sys
 RAIZ_PROYECTO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(RAIZ_PROYECTO, "src"))
 
+from hariment.registro import configurar_logging  # noqa: E402
 from hariment.gui.app import main  # noqa: E402
 
 if __name__ == "__main__":
+    configurar_logging()
     main()

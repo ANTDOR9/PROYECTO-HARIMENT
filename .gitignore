@@ -26,3 +26,9 @@ Thumbs.db
 .env
 .idea/
 .vscode/
+
+# Logs de la aplicacion
+logs/
+dist/
+build/
+*.spec

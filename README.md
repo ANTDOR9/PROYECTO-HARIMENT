@@ -135,6 +135,30 @@ cp assets/config/settings.example.json assets/config/settings.json              
 
 > Nota: `pytesseract` requiere además tener instalado el motor [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) en el sistema operativo.
 
+## Uso
+
+```bash
+# Interfaz de escritorio
+python scripts/run_gui.py
+
+# API (documentacion interactiva en http://127.0.0.1:8000/docs)
+python scripts/run_api.py
+```
+
+Los logs de la aplicación (útiles para depurar errores, especialmente
+una vez empaquetada) quedan en `logs/hariment.log`.
+
+## Empaquetado (Windows)
+
+```bash
+pip install pyinstaller
+python scripts/build_windows.py
+```
+
+Genera un ejecutable en `dist/HarimentApp/HarimentApp.exe`. Se usa modo
+carpeta (`--onedir`) en vez de un solo archivo porque Whisper y
+`transformers` son pesados y `--onedir` arranca mucho más rápido.
+
 ## Licencia
 
 Por definir.

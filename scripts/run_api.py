@@ -29,6 +29,9 @@ def _leer_host_y_puerto() -> tuple[str, int]:
 if __name__ == "__main__":
     import uvicorn
 
+    from hariment.registro import configurar_logging
+
+    configurar_logging()
     host, puerto = _leer_host_y_puerto()
     print(f"Iniciando PROYECTO HARIMENT API en http://{host}:{puerto} (docs en /docs)")
     uvicorn.run("hariment.api.main:app", host=host, port=puerto, reload=False)
