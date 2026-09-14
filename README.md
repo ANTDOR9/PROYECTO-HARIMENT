@@ -49,7 +49,7 @@ A futuro, cada entrada y la traducción podrán exponerse como endpoints indepen
 
 ## Estado del proyecto
 
-En planificación / diseño inicial. Aún no hay código implementado.
+Las 9 etapas planificadas están implementadas end-to-end (micrófono, audio del sistema, OCR de pantalla, traducción, interfaz configurable, API y empaquetado). Próximos pasos naturales: ampliar idiomas más allá de es/en/pt, y explorar una interfaz de escritorio más avanzada o una versión móvil.
 
 ## Estructura de carpetas
 

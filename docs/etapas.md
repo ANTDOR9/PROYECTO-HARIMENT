@@ -24,5 +24,5 @@ Función para capturar pantalla, reconocer texto (`pytesseract` o `TrOCR`) y tra
 ## Etapa 8 — Exposición como API ✅
 Separar el motor (voz, OCR, traducción) detrás de una API con `FastAPI`, para que la interfaz de escritorio (y a futuro una app móvil) lo consuman como cliente.
 
-## Etapa 9 — Empaquetado y pulido final
+## Etapa 9 — Empaquetado y pulido final ✅
 Empaquetado ejecutable para Windows, manejo de errores, pruebas, optimización de rendimiento y documentación final. Exploración de interfaz avanzada / versión móvil.
