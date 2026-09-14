@@ -21,7 +21,7 @@ Captura del audio que reproduce el propio computador (videos, llamadas) como seg
 ## Etapa 7 — Captura de pantalla + OCR ✅
 Función para capturar pantalla, reconocer texto (`pytesseract` o `TrOCR`) y traducirlo, mostrado en el mismo overlay de subtítulos.
 
-## Etapa 8 — Exposición como API
+## Etapa 8 — Exposición como API ✅
 Separar el motor (voz, OCR, traducción) detrás de una API con `FastAPI`, para que la interfaz de escritorio (y a futuro una app móvil) lo consuman como cliente.
 
 ## Etapa 9 — Empaquetado y pulido final
