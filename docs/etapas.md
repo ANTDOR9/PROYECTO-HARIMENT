@@ -9,7 +9,7 @@ Integración de `transformers` (modelo Helsinki-NLP u otro) para traducir texto 
 ## Etapa 3 — Reconocimiento de voz por micrófono ✅
 Integración de `openai-whisper` para transcribir el micrófono en tiempo real y conectarlo con el núcleo de traducción de la Etapa 2.
 
-## Etapa 4 — Interfaz gráfica mínima con subtítulos
+## Etapa 4 — Interfaz gráfica mínima con subtítulos ✅
 Ventana de escritorio (`customtkinter`/`tkinter`) que muestra el texto transcrito y traducido como subtítulo. Botones básicos de iniciar/detener.
 
 ## Etapa 5 — Configuración de subtítulos e idiomas
