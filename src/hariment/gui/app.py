@@ -41,7 +41,7 @@ from hariment.audio.sistema_loopback import (
     TranscriptorAudioSistema,
 )
 from hariment.gui.configuracion import GestorConfiguracion, crear_ventana_configuracion
-from hariment.ocr.captura_pantalla import capturar_pantalla
+from hariment.ocr.captura_pantalla import capturar_pantalla, seleccionar_region_pantalla
 from hariment.ocr.reconocimiento_texto import ReconocedorTexto
 from hariment.translation.traductor import Traductor
 
@@ -77,6 +77,11 @@ class AplicacionHariment:
 
         motor_ocr = self.configuracion.get("ocr", {}).get("motor", "pytesseract")
         self.reconocedor_texto = ReconocedorTexto(motor=motor_ocr)
+
+        # Region de pantalla (x, y, ancho, alto) elegida por el usuario para
+        # el OCR. Si es None, se captura la pantalla completa (comportamiento
+        # por defecto).
+        self._region_captura = None
 
         self._construir_ventana()
         self._aplicar_estilo_subtitulo(self.configuracion.get("subtitulos", {}))
@@ -145,7 +150,12 @@ class AplicacionHariment:
         self.boton_capturar_pantalla = self._boton(
             marco, texto="📷 Traducir pantalla", comando=self._capturar_y_traducir_pantalla
         )
-        self.boton_capturar_pantalla.pack(side="left", padx=(0, 20))
+        self.boton_capturar_pantalla.pack(side="left", padx=(0, 5))
+
+        self.boton_elegir_region = self._boton(
+            marco, texto="🖼 Elegir área", comando=self._elegir_region_captura
+        )
+        self.boton_elegir_region.pack(side="left", padx=(0, 20))
 
     def _construir_historial(self) -> None:
         self.area_historial = scrolledtext.ScrolledText(
@@ -303,11 +313,38 @@ class AplicacionHariment:
         # transformers) puede tardar y no debe congelar la ventana.
         threading.Thread(target=self._ejecutar_captura_en_hilo, daemon=True).start()
 
+    def _elegir_region_captura(self) -> None:
+        """Deja que el usuario dibuje con el mouse la zona exacta de la
+        pantalla que se quiere capturar (por ejemplo, la caja de chat de
+        un juego), en vez de capturar la pantalla completa cada vez.
+
+        Capturar solo esa zona mejora mucho la calidad del OCR: evita que
+        se mezcle texto de la propia ventana de HARIMENT, del juego, del
+        escritorio, etc. en una sola imagen ruidosa.
+        """
+        # Se minimiza la ventana un instante para que no aparezca ella misma
+        # dentro de la captura de referencia que ve el usuario al seleccionar.
+        self.ventana.iconify()
+        self.ventana.after(200, self._mostrar_selector_de_region)
+
+    def _mostrar_selector_de_region(self) -> None:
+        region = seleccionar_region_pantalla(self.ventana)
+        self.ventana.deiconify()
+        if region is not None:
+            self._region_captura = region
+            self.etiqueta_subtitulo.configure(
+                text=f"Área de captura configurada ({region[2]}x{region[3]} px). "
+                "Usa '📷 Traducir pantalla' para traducir esa zona."
+            )
+            self.boton_elegir_region.configure(text="🖼 Área elegida ✓")
+        # Si el usuario cancelo (Esc), se mantiene la region anterior (o
+        # ninguna, si nunca eligio una) sin mostrar ningun error.
+
     def _ejecutar_captura_en_hilo(self) -> None:
         """Corre en un hilo aparte para no congelar la ventana mientras se
         captura la pantalla y se reconoce el texto (OCR)."""
         try:
-            imagen = capturar_pantalla()
+            imagen = capturar_pantalla(region=self._region_captura)
             texto = self.reconocedor_texto.reconocer(imagen, idioma=self.traductor.idioma_origen)
         except Exception as error:  # se informa el error en vez de dejar la app colgada
             logger.exception("Fallo la captura/reconocimiento de pantalla")

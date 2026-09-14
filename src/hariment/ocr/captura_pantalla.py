@@ -52,6 +52,87 @@ def capturar_pantalla(
         return imagen
 
 
+def seleccionar_region_pantalla(ventana_padre=None):
+    """Muestra una ventana semitransparente de pantalla completa donde el
+    usuario dibuja un rectangulo (clic + arrastrar) para elegir la zona
+    exacta que se quiere capturar (por ejemplo, la caja de chat de un
+    juego o los subtitulos de un video), en vez de capturar toda la
+    pantalla.
+
+    Se usa una ventana de tkinter en vez de mss/PIL para el overlay
+    porque necesita recibir eventos de mouse en tiempo real; la
+    captura final de la imagen se sigue haciendo con `capturar_pantalla`.
+
+    Args:
+        ventana_padre: ventana tkinter existente (para que el overlay se
+            comporte como un dialogo de esa aplicacion). Puede ser None.
+
+    Returns:
+        Una tupla (x, y, ancho, alto) en pixeles de pantalla, o `None` si
+        el usuario cancelo (tecla Escape) o hizo un area invalida
+        (ancho o alto menor a 5 pixeles).
+    """
+    import tkinter as tk
+
+    resultado = {"region": None}
+    inicio = {"x": 0, "y": 0}
+
+    overlay = tk.Toplevel(ventana_padre) if ventana_padre is not None else tk.Tk()
+    overlay.attributes("-fullscreen", True)
+    overlay.attributes("-alpha", 0.3)
+    overlay.configure(bg="black")
+    overlay.attributes("-topmost", True)
+    overlay.config(cursor="crosshair")
+
+    lienzo = tk.Canvas(overlay, bg="black", highlightthickness=0)
+    lienzo.pack(fill="both", expand=True)
+
+    etiqueta_ayuda = tk.Label(
+        overlay,
+        text="Arrastra para elegir el área a capturar. Esc para cancelar.",
+        fg="white",
+        bg="black",
+        font=("Segoe UI", 14),
+    )
+    lienzo.create_window(20, 20, anchor="nw", window=etiqueta_ayuda)
+
+    rectangulo_id = {"id": None}
+
+    def _al_presionar(evento):
+        inicio["x"], inicio["y"] = evento.x, evento.y
+        if rectangulo_id["id"] is not None:
+            lienzo.delete(rectangulo_id["id"])
+        rectangulo_id["id"] = lienzo.create_rectangle(
+            evento.x, evento.y, evento.x, evento.y, outline="#00FF00", width=2
+        )
+
+    def _al_arrastrar(evento):
+        if rectangulo_id["id"] is not None:
+            lienzo.coords(rectangulo_id["id"], inicio["x"], inicio["y"], evento.x, evento.y)
+
+    def _al_soltar(evento):
+        x0, y0 = inicio["x"], inicio["y"]
+        x1, y1 = evento.x, evento.y
+        x, y = min(x0, x1), min(y0, y1)
+        ancho, alto = abs(x1 - x0), abs(y1 - y0)
+        if ancho >= 5 and alto >= 5:
+            resultado["region"] = (x, y, ancho, alto)
+        overlay.destroy()
+
+    def _al_cancelar(_evento=None):
+        overlay.destroy()
+
+    lienzo.bind("<ButtonPress-1>", _al_presionar)
+    lienzo.bind("<B1-Motion>", _al_arrastrar)
+    lienzo.bind("<ButtonRelease-1>", _al_soltar)
+    overlay.bind("<Escape>", _al_cancelar)
+
+    overlay.grab_set()
+    overlay.wait_window()
+
+    return resultado["region"]
+
+
 def listar_monitores() -> list[dict]:
     """Devuelve informacion de los monitores disponibles (para una futura
     seleccion en la interfaz de "que pantalla/monitor capturar")."""

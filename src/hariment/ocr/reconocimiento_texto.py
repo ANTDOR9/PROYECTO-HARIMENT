@@ -43,6 +43,47 @@ class MotorOcrNoSoportadoError(Exception):
     """Se lanza cuando se pide un motor de OCR que no esta implementado."""
 
 
+class TesseractNoInstaladoError(Exception):
+    """Se lanza cuando pytesseract no logra encontrar el ejecutable de Tesseract."""
+
+
+# Rutas donde el instalador oficial de Tesseract para Windows (UB-Mannheim)
+# suele dejar el ejecutable. Si pytesseract no lo encuentra en el PATH,
+# probamos estas rutas conocidas antes de rendirnos.
+_RUTAS_TESSERACT_WINDOWS = [
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+    r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+]
+
+_ruta_tesseract_configurada = False
+
+
+def _configurar_ruta_tesseract(pytesseract_modulo) -> None:
+    """Si Tesseract no esta en el PATH, intenta apuntar pytesseract
+    directamente al .exe en las rutas de instalacion tipicas de Windows.
+
+    Se ejecuta una sola vez por proceso (cacheado con una bandera simple)
+    para no pagar el costo de revisar el sistema de archivos en cada
+    captura de pantalla.
+    """
+    global _ruta_tesseract_configurada
+    if _ruta_tesseract_configurada:
+        return
+    _ruta_tesseract_configurada = True
+
+    import shutil
+
+    if shutil.which(pytesseract_modulo.pytesseract.tesseract_cmd or "tesseract"):
+        return
+
+    import os
+
+    for ruta in _RUTAS_TESSERACT_WINDOWS:
+        if os.path.isfile(ruta):
+            pytesseract_modulo.pytesseract.tesseract_cmd = ruta
+            return
+
+
 class ReconocedorTexto:
     """Reconoce texto dentro de una imagen, usando el motor de OCR configurado."""
 
@@ -76,8 +117,36 @@ class ReconocedorTexto:
     def _reconocer_con_pytesseract(self, imagen, idioma: str) -> str:
         import pytesseract
 
+        _configurar_ruta_tesseract(pytesseract)
+
         codigo_tesseract = CODIGOS_IDIOMA_TESSERACT.get(idioma, "eng")
-        texto = pytesseract.image_to_string(imagen, lang=codigo_tesseract)
+        try:
+            texto = pytesseract.image_to_string(imagen, lang=codigo_tesseract)
+        except pytesseract.TesseractNotFoundError as error:
+            raise TesseractNoInstaladoError(
+                "No se encontro el programa Tesseract OCR instalado en el sistema. "
+                "Instalalo desde https://github.com/UB-Mannheim/tesseract/wiki "
+                "(usa las opciones por defecto) y vuelve a intentar. Si ya lo "
+                "instalaste, verifica que la carpeta de instalacion este en el "
+                "PATH del sistema o reinicia la terminal despues de instalarlo."
+            ) from error
+        except pytesseract.TesseractError as error:
+            mensaje = str(error)
+            if "Failed loading language" in mensaje or "Error opening data file" in mensaje:
+                # El motor de Tesseract esta instalado pero le falta el
+                # paquete de datos de idioma (por ejemplo "spa" para
+                # espanol). El instalador de Windows solo trae ingles
+                # por defecto salvo que se marquen idiomas adicionales.
+                raise TesseractNoInstaladoError(
+                    f"Tesseract esta instalado pero le falta el paquete de idioma "
+                    f"'{codigo_tesseract}' (necesario para reconocer texto en "
+                    f"'{idioma}'). Descarga el archivo '{codigo_tesseract}.traineddata' "
+                    f"desde https://github.com/tesseract-ocr/tessdata "
+                    f"y colocalo dentro de la carpeta "
+                    f"'C:\\Program Files\\Tesseract-OCR\\tessdata\\'. "
+                    f"Luego vuelve a intentar."
+                ) from error
+            raise
         return texto.strip()
 
     def _reconocer_con_trocr(self, imagen) -> str:
