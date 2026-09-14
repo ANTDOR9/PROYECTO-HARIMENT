@@ -185,7 +185,8 @@ class TranscriptorAudioSistema:
                     segundos_en_silencio = 0.0
 
     def _transcribir_y_notificar(self, audio: np.ndarray) -> None:
-        resultado = self._modelo_whisper.transcribe(audio, language=self.idioma, fp16=False)
+        idioma_para_whisper = None if self.idioma in (None, "auto") else self.idioma
+        resultado = self._modelo_whisper.transcribe(audio, language=idioma_para_whisper, fp16=False)
         texto = (resultado.get("text") or "").strip()
         if not texto:
             return

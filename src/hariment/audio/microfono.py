@@ -173,9 +173,12 @@ class TranscriptorMicrofono:
                     segundos_en_silencio = 0.0
 
     def _transcribir_y_notificar(self, audio: np.ndarray) -> None:
+        # Whisper espera None para "detectar automaticamente", no el texto
+        # "auto" (que es lo que usa el resto del proyecto/la configuracion).
+        idioma_para_whisper = None if self.idioma in (None, "auto") else self.idioma
         resultado = self._modelo_whisper.transcribe(
             audio,
-            language=self.idioma,
+            language=idioma_para_whisper,
             fp16=False,
         )
         texto = (resultado.get("text") or "").strip()

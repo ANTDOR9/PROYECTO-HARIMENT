@@ -1,5 +1,5 @@
 {
-  "idioma_origen": "auto",
+  "idioma_origen": "es",
   "idioma_destino": "en",
   "idiomas_disponibles": ["es", "en", "pt"],
   "fuente_entrada": "microfono",
